@@ -1,0 +1,71 @@
+# Helm values for docker-mailserver on sion2k.ru (sion2k-cluster).
+# Chart: docker-mailserver/docker-mailserver 5.1.1 (app 15.1.0)
+
+certificate: mail-tls-certificate-rsa
+
+image:
+  name: ghcr.io/docker-mailserver/docker-mailserver
+  tag: "15.1.0"
+  pullPolicy: IfNotPresent
+
+deployment:
+  replicas: 1
+  strategy:
+    type: Recreate
+  env:
+    OVERRIDE_HOSTNAME: mail.sion2k.ru
+    POSTMASTER_ADDRESS: vladimir@sion2k.ru
+    TZ: Europe/Moscow
+    LOG_LEVEL: info
+    ENABLE_IMAP: 1
+    ENABLE_RSPAMD: 1
+    ENABLE_RSPAMD_REDIS: 1
+    ENABLE_OPENDKIM: 0
+    ENABLE_OPENDMARC: 0
+    ENABLE_POLICYD_SPF: 0
+    ENABLE_CLAMAV: 0
+    ENABLE_FAIL2BAN: 0
+    ENABLE_SPAMASSASSIN: 0
+    ENABLE_AMAVIS: 0
+  resources:
+    requests:
+      cpu: "600m"
+      memory: "1536Mi"
+    limits:
+      cpu: "1500m"
+      memory: "2048Mi"
+
+service:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  annotations:
+    kube-vip.io/loadbalancerIPs: "192.168.88.25"
+
+proxyProtocol:
+  enabled: false
+
+persistent_volume_claims:
+  mail-config:
+    enabled: true
+    size: 50Mi
+    storageClass: proxmox-data-xfs
+    accessModes:
+      - ReadWriteOnce
+  mail-data:
+    enabled: true
+    size: 20Gi
+    storageClass: proxmox-data-xfs
+    accessModes:
+      - ReadWriteOnce
+  mail-state:
+    enabled: true
+    size: 2Gi
+    storageClass: proxmox-data-xfs
+    accessModes:
+      - ReadWriteOnce
+  mail-log:
+    enabled: true
+    size: 2Gi
+    storageClass: proxmox-data-xfs
+    accessModes:
+      - ReadWriteOnce

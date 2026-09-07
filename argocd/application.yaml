@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mail
+  namespace: shturval-cd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mail
+  sources:
+    - repoURL: https://docker-mailserver.github.io/docker-mailserver-helm
+      chart: docker-mailserver
+      targetRevision: "5.1.1"
+      helm:
+        releaseName: docker-mailserver
+        valueFiles:
+          - $values/values.yaml
+    - repoURL: https://github.com/vutratenko/mail.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/vutratenko/mail.git
+      targetRevision: main
+      path: deploy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
