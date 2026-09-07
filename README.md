@@ -16,7 +16,7 @@ Kubernetes deployment of [docker-mailserver](https://github.com/docker-mailserve
 - **FQDN:** `mail.sion2k.ru`
 - **Mailbox:** `vladimir@sion2k.ru`
 - **Alias:** `postmaster@sion2k.ru` → `vladimir@sion2k.ru`
-- **LoadBalancer VIP:** `192.168.88.25` (kube-vip)
+- **LoadBalancer VIP:** `192.168.88.111` (kube-vip; `.25` is occupied on LAN)
 - **Public IP:** `95.165.3.62` — port-specific DNAT on router
 - **TLS:** cert-manager `corp-acme` (HTTP-01 via nginx ingress)
 - **Storage:** `proxmox-data-xfs`
@@ -60,7 +60,7 @@ Forward from public IP `95.165.3.62`:
 
 | Ports | Target | Purpose |
 |-------|--------|---------|
-| TCP 25, 465, 587, 993 | `192.168.88.25` | SMTP / submission / IMAPS |
+| TCP 25, 465, 587, 993 | `192.168.88.111` | SMTP / submission / IMAPS |
 | TCP 80, 443 | `192.168.88.9` | ACME HTTP-01 for `mail.sion2k.ru` |
 
 Example MikroTik:
@@ -68,7 +68,7 @@ Example MikroTik:
 ```
 /ip firewall nat
 add chain=dstnat protocol=tcp dst-address=95.165.3.62 dst-port=25,465,587,993 \
-  action=dst-nat to-addresses=192.168.88.25
+  action=dst-nat to-addresses=192.168.88.111
 ```
 
 Ensure 80/443 for the same public IP already reach ingress (same as other `*.sion2k.ru` services).

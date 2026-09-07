@@ -39,7 +39,7 @@ service:
   type: LoadBalancer
   externalTrafficPolicy: Local
   annotations:
-    kube-vip.io/loadbalancerIPs: "192.168.88.25"
+    kube-vip.io/loadbalancerIPs: "192.168.88.111"
 
 proxyProtocol:
   enabled: false
