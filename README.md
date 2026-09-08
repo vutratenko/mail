@@ -54,24 +54,65 @@ chmod +x ops/*.sh
 ./ops/bootstrap-mailbox.sh 'your-strong-password'
 ```
 
-## Router DNAT (manual)
+## Router DNAT (two-tier)
 
-Forward from public IP `95.165.3.62`:
+Public IP `95.165.3.62` (Beeline) → MikroTik WAN `192.168.1.3` (ether1) → k8s VIPs.
 
-| Ports | Target | Purpose |
-|-------|--------|---------|
-| TCP 25, 465, 587, 993 | `192.168.88.111` | SMTP / submission / IMAPS |
-| TCP 80, 443 | `192.168.88.9` | ACME HTTP-01 for `mail.sion2k.ru` |
-
-Example MikroTik:
-
+```mermaid
+flowchart LR
+  Internet["Internet 95.165.3.62"] --> Beeline["Beeline 192.168.1.1"]
+  Beeline --> MikroTik["MikroTik 192.168.1.3"]
+  MikroTik --> MailVIP["mail 192.168.88.111"]
+  MikroTik --> Ingress["ingress 192.168.88.9"]
 ```
+
+### Beeline router (192.168.1.1) → MikroTik WAN (192.168.1.3)
+
+| Protocol | External port | Internal IP | Internal port | Purpose |
+|----------|---------------|-------------|---------------|---------|
+| TCP | 25 | 192.168.1.3 | 25 | SMTP (inbound mail) |
+| TCP | 465 | 192.168.1.3 | 465 | SMTPS (send, SSL) |
+| TCP | 587 | 192.168.1.3 | 587 | Submission (send, STARTTLS) |
+| TCP | 993 | 192.168.1.3 | 993 | IMAPS (read mail) |
+
+Already required for ingress / ACME:
+
+| Protocol | External port | Internal IP | Internal port |
+|----------|---------------|-------------|---------------|
+| TCP | 80 | 192.168.1.3 | 80 |
+| TCP | 443 | 192.168.1.3 | 443 |
+
+Do **not** expose: TCP 143 (IMAP cleartext), TCP 11334 (Rspamd admin).
+
+### MikroTik (admin@192.168.88.1) → k8s LoadBalancer
+
+Applied on `ether1` (`action=netmap`, same style as Plex/minecraft rules):
+
+| External port | Target | Purpose |
+|---------------|--------|---------|
+| TCP 25 | 192.168.88.111 | SMTP |
+| TCP 465 | 192.168.88.111 | SMTPS |
+| TCP 587 | 192.168.88.111 | Submission |
+| TCP 993 | 192.168.88.111 | IMAPS |
+| TCP 80 | 192.168.88.9 | HTTP (ACME) — already configured |
+| TCP 443 | 192.168.88.9 | HTTPS (ingress) — already configured |
+
+Example (already applied):
+
+```routeros
 /ip firewall nat
-add chain=dstnat protocol=tcp dst-address=95.165.3.62 dst-port=25,465,587,993 \
-  action=dst-nat to-addresses=192.168.88.111
+add chain=dstnat action=netmap to-addresses=192.168.88.111 protocol=tcp in-interface=ether1 dst-port=25 comment="mail smtp"
+add chain=dstnat action=netmap to-addresses=192.168.88.111 protocol=tcp in-interface=ether1 dst-port=465 comment="mail submissions"
+add chain=dstnat action=netmap to-addresses=192.168.88.111 protocol=tcp in-interface=ether1 dst-port=587 comment="mail submission"
+add chain=dstnat action=netmap to-addresses=192.168.88.111 protocol=tcp in-interface=ether1 dst-port=993 comment="mail imaps"
 ```
 
-Ensure 80/443 for the same public IP already reach ingress (same as other `*.sion2k.ru` services).
+Verify on MikroTik:
+
+```bash
+ssh admin@192.168.88.1 '/ip firewall nat print where comment~"mail"'
+```
+
 
 ## DNS (nic.ru)
 
