@@ -21,7 +21,20 @@ Kubernetes deployment of [docker-mailserver](https://github.com/docker-mailserve
 - **TLS:** cert-manager `corp-acme` (HTTP-01 via nginx ingress)
 - **Storage:** `proxmox-data-xfs`
 
-Mail ports (25, 465, 587, 993) hit the mail VIP. HTTP/HTTPS for ACME (`mail.sion2k.ru:80/443`) must reach ingress `192.168.88.9`, not the mail pod.
+Mail ports (25, 465, 587, 993, 4190) hit the mail VIP. HTTP/HTTPS for ACME (`mail.sion2k.ru:80/443`) must reach ingress `192.168.88.9`, not the mail pod.
+
+### Enabled features (values.yaml)
+
+| Env | Purpose |
+|-----|---------|
+| `ENABLE_RSPAMD=1` | Anti-spam, DKIM signing |
+| `ENABLE_MANAGESIEVE=1` | Server-side Sieve filters (port 4190) |
+| `ENABLE_DNSBL=1` | Postscreen DNS blocklists |
+| `MOVE_SPAM_TO_JUNK=1` | Deliver spam to Junk folder |
+| `RSPAMD_GREYLISTING=1` | Greylisting for suspicious senders |
+| `RSPAMD_LEARN=1` | Learn spam/ham when moving mail to/from Junk |
+| `SPOOF_PROTECTION=1` | Deny sending with forged From address |
+| `ENABLE_UPDATE_CHECK=0` | No upgrade notification emails |
 
 ## Prerequisites
 
@@ -74,6 +87,7 @@ flowchart LR
 | TCP | 465 | 192.168.1.3 | 465 | SMTPS (send, SSL) |
 | TCP | 587 | 192.168.1.3 | 587 | Submission (send, STARTTLS) |
 | TCP | 993 | 192.168.1.3 | 993 | IMAPS (read mail) |
+| TCP | 4190 | 192.168.1.3 | 4190 | ManageSieve (server filters) |
 
 Already required for ingress / ACME:
 
@@ -94,6 +108,7 @@ Applied on `ether1` (`action=netmap`, same style as Plex/minecraft rules):
 | TCP 465 | 192.168.88.111 | SMTPS |
 | TCP 587 | 192.168.88.111 | Submission |
 | TCP 993 | 192.168.88.111 | IMAPS |
+| TCP 4190 | 192.168.88.111 | ManageSieve |
 | TCP 80 | 192.168.88.9 | HTTP (ACME) — already configured |
 | TCP 443 | 192.168.88.9 | HTTPS (ingress) — already configured |
 
@@ -105,6 +120,7 @@ add chain=dstnat action=netmap to-addresses=192.168.88.111 protocol=tcp in-inter
 add chain=dstnat action=netmap to-addresses=192.168.88.111 protocol=tcp in-interface=ether1 dst-port=465 comment="mail submissions"
 add chain=dstnat action=netmap to-addresses=192.168.88.111 protocol=tcp in-interface=ether1 dst-port=587 comment="mail submission"
 add chain=dstnat action=netmap to-addresses=192.168.88.111 protocol=tcp in-interface=ether1 dst-port=993 comment="mail imaps"
+add chain=dstnat action=netmap to-addresses=192.168.88.111 protocol=tcp in-interface=ether1 dst-port=4190 comment="mail managesieve"
 ```
 
 Verify on MikroTik:
@@ -136,6 +152,7 @@ Fix and complete after deploy:
 | IMAP | `mail.sion2k.ru`, port 993, SSL/TLS |
 | SMTP | `mail.sion2k.ru`, port 587, STARTTLS |
 | SMTP (SSL) | port 465 |
+| ManageSieve | `mail.sion2k.ru`, port 4190, STARTTLS (Evolution filters) |
 | Username | full address `vladimir@sion2k.ru` |
 
 ## Verify
@@ -154,10 +171,11 @@ Send a test message via [mail-tester.com](https://www.mail-tester.com/) after SP
 - **Port 25:** Beeline may block outbound/inbound SMTP on residential lines; if mail fails, check ISP policy first.
 - **proxyProtocol:** disabled — kube-vip is not HAProxy.
 - **ClamAV / Fail2ban:** disabled to reduce resource use in Kubernetes.
-- **Rspamd:** enabled (DKIM signing via Rspamd, not OpenDKIM).
+- **Rspamd:** enabled (DKIM signing via Rspamd, greylisting, Bayes learning)
+- **DNSBL / greylisting:** first mail from new senders may be delayed; disable `ENABLE_DNSBL` if legitimate mail is rejected
 
 ## Chart reference
 
 - Helm repo: `https://docker-mailserver.github.io/docker-mailserver-helm`
 - Chart: `docker-mailserver` **5.1.1**
-- Image: `ghcr.io/docker-mailserver/docker-mailserver:15.1.0`
+- Image: `ghcr.io/docker-mailserver/docker-mailserver:16.0.1`
