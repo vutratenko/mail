@@ -1,11 +1,11 @@
 # Helm values for docker-mailserver on sion2k.ru (sion2k-cluster).
-# Chart: docker-mailserver/docker-mailserver 5.1.1 (app 15.1.0)
+# Chart: docker-mailserver/docker-mailserver 5.1.1 (image 16.0.1)
 
 certificate: mail-tls-certificate-rsa
 
 image:
   name: ghcr.io/docker-mailserver/docker-mailserver
-  tag: "15.1.0"
+  tag: "16.0.1"
   pullPolicy: IfNotPresent
 
 deployment:
@@ -18,8 +18,15 @@ deployment:
     TZ: Europe/Moscow
     LOG_LEVEL: info
     ENABLE_IMAP: 1
+    ENABLE_MANAGESIEVE: 1
     ENABLE_RSPAMD: 1
     ENABLE_RSPAMD_REDIS: 1
+    ENABLE_DNSBL: 1
+    ENABLE_UPDATE_CHECK: 0
+    MOVE_SPAM_TO_JUNK: 1
+    RSPAMD_GREYLISTING: 1
+    RSPAMD_LEARN: 1
+    SPOOF_PROTECTION: 1
     ENABLE_OPENDKIM: 0
     ENABLE_OPENDMARC: 0
     ENABLE_POLICYD_SPF: 0
